@@ -35,7 +35,7 @@ temp/
 session/
 
 # Environment variables are tracked
-# .env is NOT ignored
+# .env 
 
 # Package lock is tracked
-# package-lock.json is NOT ignored
+# package-lock.json 
