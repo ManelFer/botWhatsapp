@@ -3,14 +3,18 @@ import qrcode from 'qrcode-terminal';
 import pino from 'pino';
 import { rm } from 'node:fs/promises';
 
+
 import { config } from './config.js';
 import { commands } from './commands/index.js';
 import { getMenuOption, sendMainMenu } from './mainMenu.js';
+import { notifyTechnicians } from './technicians.js';
 
 const sessionDir = 'session';
 const greetedContacts = new Set<string>();
 
 async function startBot() {
+    console.log('Iniciando bot...');
+
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
     const sock = makeWASocket({
@@ -24,16 +28,17 @@ async function startBot() {
         const { connection, lastDisconnect, qr } = update;
 
         if (connection) {
-            console.log(`Conexao: ${connection}`);
+            console.log(`Status da conexao: ${connection}`);
         }
 
         if (qr) {
-            console.log('Escaneie o QR Code:\n');
+            console.log('Escaneie o QR Code para conectar o bot:\n');
             qrcode.generate(qr, { small: true });
         }
 
         if (connection === 'open') {
             console.log('Bot conectado com sucesso!');
+            console.log('ID do usuario:', sock.user?.id || 'indisponivel');
         }
 
         if (connection === 'close') {
@@ -87,22 +92,27 @@ async function startBot() {
         }
 
         const selectedOption = getMenuOption(text);
-        if (selectedOption === 'products') {
+        if (selectedOption === 'solar') {
             await sock.sendMessage(from, {
-                text: 'Perfeito! Me diga qual produto voce procura ou envie uma foto/referencia.',
+                text: 'Perfeito! esse Canal de comunicação não atende dúvidas sobre o sistema solar, mas segue abaixo o contato do setor responsável para que você possa entrar em contato:\n\n' +
+                    'Telefone: ' + process.env.SOLAR_NUMBER + '\n' 
             });
             return;
         }
 
         if (selectedOption === 'attendant') {
-            await sock.sendMessage(from, {
-                text: 'Certo, vou chamar um atendente para continuar seu atendimento.',
-            });
-            return;
-        }
+            console.log(`Opção de atendimento escolhida por: ${from}`);
 
-        if (selectedOption === 'owner') {
-            await commands.owner(sock, msg, []);
+            try {
+                const sentCount = await notifyTechnicians(sock, from);
+                console.log(`Técnicos notificados: ${sentCount}`);
+            } catch (err) {
+                console.error('Erro ao notificar técnicos:', err);
+            }
+
+            await sock.sendMessage(from, {
+                text: 'Certo, vou chamar um técnico para continuar seu atendimento.',
+            });
             return;
         }
 
